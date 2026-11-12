@@ -1,0 +1,1 @@
+import{b as e}from"./route-block-83d24a4e.js";import{D as o,o as n,c as r}from"./index-8c561bc9.js";const c={};function t(a,f){return n(),r("div",null,"Calendar")}typeof e=="function"&&e(c);const _=o(c,[["render",t]]);export{_ as default};

@@ -1,0 +1,111 @@
+name: latina-iestp-illimo
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]          # los ÚNICOS puertos abiertos a internet
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./web:/srv/web:ro                # dist del frontend
+      - caddy_data:/data                 # certificados; NO borrar este volumen
+      - caddy_config:/config
+      - /srv/latina/data/storage/app/public:/srv/storage:ro
+      - /srv/bolsalaboral/app:/srv/bolsalaboral/app:ro
+    depends_on:
+      php: { condition: service_healthy }
+
+  php:
+    image: ghcr.io/asociadosrojodi/latina-v2-api:v2.0.5
+    restart: unless-stopped
+    env_file: [.env]
+    volumes:
+      - /srv/latina/data/storage:/var/www/html/storage
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_started }
+    healthcheck:
+      test: ["CMD", "php", "artisan", "about", "--only=environment"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  queue:
+    image: ghcr.io/asociadosrojodi/latina-v2-api:v2.0.5
+    restart: unless-stopped
+    env_file: [.env]
+    user: "82:82"          # www-data: los archivos de storage/ no deben quedar como root
+    # --timeout: sin él Laravel corta cada trabajo a los 60 s, y una importación
+    # de notas (~3000 filas) puede pasar de eso: quedaba «en curso» para siempre.
+    # Debe ser menor que retry_after (REDIS_QUEUE_RETRY_AFTER) o el trabajo se
+    # vuelve a lanzar mientras sigue corriendo.
+    command: php artisan queue:work --tries=3 --timeout=1800 --max-time=3600 --sleep=1
+    volumes:
+      - /srv/latina/data/storage:/var/www/html/storage
+    depends_on:
+      php: { condition: service_healthy }
+
+  scheduler:
+    image: ghcr.io/asociadosrojodi/latina-v2-api:v2.0.5
+    restart: unless-stopped
+    env_file: [.env]
+    user: "82:82"
+    command: php artisan schedule:work
+    volumes:
+      - /srv/latina/data/storage:/var/www/html/storage
+    depends_on:
+      php: { condition: service_healthy }
+
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3306:3306"     # accesible DENTRO del VPS; nunca desde internet.
+                                  # Navicat/DBeaver se conectan por túnel SSH.
+    environment:
+      MYSQL_ROOT_PASSWORD: "xIdbzIGAjHmmzf9400OjShJ4dq5dmw3O"
+      MYSQL_DATABASE: "academico_iestp_illimo_tenant"
+      MYSQL_USER: "latina_iestp-illimo"
+      MYSQL_PASSWORD: "TmMIFjSbURh9fAT6qwsf05tLKdIQeQG2"
+    volumes:
+      - /srv/latina/data/mysql:/var/lib/mysql       # bind mount: sobrevive a Docker
+      - ./mysql-init:/docker-entrypoint-initdb.d:ro # crea la BD de auditoría
+    command: >
+      --default-authentication-plugin=caching_sha2_password
+      --innodb-buffer-pool-size=6007M
+      --max-connections=500
+    # Por TCP y no por socket: al inicializar, la imagen levanta un servidor
+    # temporal SIN red que ya responde por socket; con «localhost» el servicio
+    # quedaba healthy, ese servidor se apagaba y lo siguiente fallaba.
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-pxIdbzIGAjHmmzf9400OjShJ4dq5dmw3O"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+
+  backup:
+    image: ghcr.io/asociadosrojodi/latina-v2-backup:v2.0.5
+    restart: unless-stopped
+    env_file: [.env.backup]
+    volumes:
+      # Lo que se respalda. Con escritura: `restore <id> --apply` copia aquí los
+      # archivos. En solo lectura la restauración dejaba la base restaurada y
+      # los archivos sin restaurar.
+      - /srv/latina/data/storage:/data/storage
+      - /srv/latina/backups:/backups                # destino: mismo VPS, FUERA de data/
+    depends_on:
+      mysql: { condition: service_healthy }
+
+volumes:
+  redis_data:
+  caddy_data:
+  caddy_config:

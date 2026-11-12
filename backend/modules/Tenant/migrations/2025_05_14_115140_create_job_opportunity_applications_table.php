@@ -1,0 +1,49 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+  /**
+   * Run the migrations.
+   */
+  public function up(): void
+  {
+    Schema::create('job_opportunity_applications', function (Blueprint $table) {
+      $table->id();
+      $table->string('fullname');
+      $table->string('program_study')->nullable();
+      $table->text('message')->nullable();
+      $table->string('status')->default('postulated');
+      $table->string('cv')->nullable();
+      $table->text('feedback')->nullable();
+      $table->datetime('feedback_date')->nullable();
+
+      $table->foreignId('offer_id')
+        ->references('id')
+        ->on('job_opportunity_offer')
+        ->onUpdate('cascade')
+        ->onDelete('cascade');
+
+      $table->foreignId('user_id')
+        ->references('id')
+        ->on('user')
+        ->onUpdate('cascade')
+        ->onDelete('cascade');
+
+      $table->dateTime('created_at')->nullable();
+      $table->dateTime('updated_at')->nullable();
+      $table->dateTime('deleted_at')->nullable();
+    });
+  }
+
+  /**
+   * Reverse the migrations.
+   */
+  public function down(): void
+  {
+    Schema::dropIfExists('job_opportunity_applications');
+  }
+};

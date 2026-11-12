@@ -1,0 +1,14 @@
+apps:
+  - name: queue
+    script: artisan
+    exec_mode: fork
+    interpreter: php
+    instances: 1
+    autorestart: true
+    watch: false
+    max_memory_restart: 1G
+    args:
+      - queue:work
+      - --tries=5
+      - --sleep=1
+      - --timeout=5000

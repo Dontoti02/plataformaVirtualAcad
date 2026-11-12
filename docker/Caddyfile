@@ -1,0 +1,103 @@
+api.plataforma.iestpillimo.edu.pe {
+    # Los archivos públicos (logos, avatares, banners) se sirven directo desde el
+    # host, evitando el symlink public/storage que cruzaría dos montajes.
+    handle_path /storage/* {
+        root * /srv/storage
+        file_server
+    }
+
+    # Todo lo demás va a Laravel. NO se usa php_fastcgi: busca index.php en el
+    # disco de CADDY, y el código vive en el contenedor php. Al no encontrarlo,
+    # respondía 404 a todo sin llegar a PHP. Caddy solo enruta: el script es
+    # siempre public/index.php dentro del contenedor php.
+    handle {
+        reverse_proxy php:9000 {
+            transport fastcgi {
+                root /var/www/html/public
+                env SCRIPT_FILENAME /var/www/html/public/index.php
+                env SCRIPT_NAME /index.php
+            }
+            trusted_proxies private_ranges
+        }
+    }
+
+    encode gzip zstd
+
+    request_body {
+        max_size 100MB      
+    }
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Frame-Options "SAMEORIGIN"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+
+    log {
+        output stderr
+        format console
+    }
+}
+
+plataforma.iestpillimo.edu.pe {
+    root * /srv/web
+
+    # config.json cambia por institución y por despliegue: nunca cachearlo.
+    @config path /config.json
+    header @config Cache-Control "no-store"
+
+    # Los assets con hash en el nombre sí son inmutables.
+    @assets path /assets/*
+    header @assets Cache-Control "public, max-age=31536000, immutable"
+
+    try_files {path} /index.html      # SPA fallback para Vue Router
+    file_server
+    encode gzip zstd
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+
+    log {
+        output stderr
+        format console
+    }
+}
+
+bolsalaboral.iestpillimo.edu.pe {
+    root * /srv/bolsalaboral/app/public
+
+    handle_path /storage/* {
+        root * /srv/bolsalaboral/app/storage/app/public
+        file_server
+    }
+
+    php_fastcgi 172.18.0.1:9001 {
+        trusted_proxies private_ranges
+    }
+
+    file_server
+    encode gzip zstd
+
+    request_body {
+        max_size 100MB
+    }
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Frame-Options "SAMEORIGIN"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+
+    log {
+        output stderr
+        format console
+    }
+}

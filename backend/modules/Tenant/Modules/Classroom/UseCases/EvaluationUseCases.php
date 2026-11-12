@@ -1,0 +1,35 @@
+<?php
+
+namespace Modules\Tenant\Modules\Classroom\UseCases;
+
+use Exception;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Modules\Shared\Utils\Response;
+use Modules\Tenant\Modules\Classroom\Repositories\EvaluationRepository;
+
+class EvaluationUseCases
+{
+    public static function list(int $classroom_id, int $person_id)
+    {
+        try {
+            $result = EvaluationRepository::list($classroom_id, $person_id);
+            return Response::success($result);
+        } catch (Exception $e) {
+            return Response::error($e->getMessage());
+        }
+    }
+
+    public static function evaluate(Request $request)
+    {
+        DB::beginTransaction();
+        try {
+            $result = EvaluationRepository::evaluate($request);
+            DB::commit();
+            return Response::success($result);
+        } catch (Exception $e) {
+            DB::rollBack();
+            return Response::error($e->getMessage());
+        }
+    }
+}

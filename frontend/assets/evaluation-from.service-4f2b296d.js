@@ -1,0 +1,1 @@
+import{aH as e}from"./index-8c561bc9.js";class r{static async getInputTypes(){return await e.get("/tenant/evaluation_form/question/types")}static async getEvaluationForm(a,t){return await e.get(`/tenant/evaluation_form/${a}${t?`/${t}`:""}`)}static async sendEvaluationForm(a,t){return await e.post("/tenant/evaluation_form/delivered",{uuid:a,questions:t})}}export{r as E};

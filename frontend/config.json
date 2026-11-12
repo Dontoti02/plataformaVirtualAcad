@@ -1,0 +1,9 @@
+{
+  "apiUrl": "https://api.plataforma.iestpillimo.edu.pe/api",
+  "institutionId": "30",
+  "institutionName": "IESTP ILLIMO",
+  "appTitle": "IESTP ILLIMO",
+  "appDescription": "Plataforma académica",
+  "tenantSubdomain": null,
+  "features": {}
+}

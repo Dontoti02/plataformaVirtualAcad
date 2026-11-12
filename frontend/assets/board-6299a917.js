@@ -1,0 +1,1 @@
+import{b as o}from"./route-block-83d24a4e.js";import{D as e,o as r,c as t}from"./index-8c561bc9.js";const c={};function n(a,f){return r(),t("div",null,"Board")}typeof o=="function"&&o(c);const i=e(c,[["render",n]]);export{i as default};
