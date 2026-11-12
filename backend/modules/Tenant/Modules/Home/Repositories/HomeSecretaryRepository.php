@@ -30,7 +30,7 @@ class HomeSecretaryRepository
 
         $summary = [
             [
-                'title' => 'Cursos activos',
+                'title' => 'Unidades didácticas activas',
                 'value' => $period ? $classrooms->total : 0,
             ],
             [

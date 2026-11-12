@@ -52,7 +52,7 @@ class NoteReportRepository
         $contents = Content::query()
             ->join('content_group', 'content.content_group_id', '=', 'content_group.id')
             ->where('content_group.classroom_id', $classroomId)
-            ->where('content_group.title', '!=', self::GROUP_EXCLUDED)
+            ->whereNotIn('content_group.title', ['Documentos Pedagógicos', 'Sílabo'])
             ->whereIn('content.indicator_id', $indicatorIds)
             ->whereIn('content.type', ['task', 'evaluation'])
             ->orderBy('content_group.created_at', 'asc')

@@ -189,7 +189,7 @@ class ScheduleHelper
             $end = Carbon::createFromFormat('H:i', $classroom->hour_end);
 
             if ($hour_start->lt($end) && $start->lt($hour_end)) {
-                throw new Exception("El horario se cruza con el curso $classroom->course_name");
+                throw new Exception("El horario se cruza con la unidad didáctica $classroom->course_name");
             }
         }
     }
@@ -239,7 +239,7 @@ class ScheduleHelper
 
                 if ($crosses) {
                     $day = DaysOfWeek::DAYS[$assigned->day];
-                    throw new Exception("Al docente se le cruza el horario con el curso $assigned->course_name (sección $assigned->section_name) el día $day, de $assigned->hour_start a $assigned->hour_end");
+                    throw new Exception("Al docente se le cruza el horario con la unidad didáctica $assigned->course_name (sección $assigned->section_name) el día $day, de $assigned->hour_start a $assigned->hour_end");
                 }
             }
         }

@@ -77,7 +77,7 @@ class EvaluationRepository
 
         $content_groups = $classroom->contentGroups()
             ->select('id', 'title')
-            ->whereNot('title', 'Sílabo')
+            ->whereNotIn('title', ['Documentos Pedagógicos', 'Sílabo'])
             ->get()
             ->each(function ($content_group) use ($user, $capacities) {
                 $content_group->evaluations = $content_group->contents()

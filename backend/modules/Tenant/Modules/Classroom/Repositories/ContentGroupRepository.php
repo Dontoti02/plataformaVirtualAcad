@@ -20,7 +20,7 @@ class ContentGroupRepository
 
         $content_groups = $classroom->contentGroups()
             ->select('id', 'title')
-            ->whereNot('title', 'Sílabo')
+            ->whereNotIn('title', ['Documentos Pedagógicos', 'Sílabo'])
             ->get();
 
         return $content_groups;
@@ -52,8 +52,8 @@ class ContentGroupRepository
 
         $content_group = ContentGroup::byKey('id', $id);
 
-        if ($content_group->title == 'Sílabo') {
-            throw new Exception('No se puede modificar el grupo de contenido Sílabo');
+        if (in_array($content_group->title, ['Documentos Pedagógicos', 'Sílabo'])) {
+            throw new Exception('No se puede modificar el grupo de contenido Documentos Pedagógicos');
         }
 
         $request->merge(['classroom_id' => $content_group->classroom_id]);
@@ -77,8 +77,8 @@ class ContentGroupRepository
 
         $content_group = ContentGroup::byKey('id', $id);
 
-        if ($content_group->title == 'Sílabo') {
-            throw new Exception('No se puede eliminar el grupo de contenido Sílabo');
+        if (in_array($content_group->title, ['Documentos Pedagógicos', 'Sílabo'])) {
+            throw new Exception('No se puede eliminar el grupo de contenido Documentos Pedagógicos');
         }
 
         ClassroomHelper::validateTeacherAccess($user->person_id, $content_group->classroom_id);

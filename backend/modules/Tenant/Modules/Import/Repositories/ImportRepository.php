@@ -826,7 +826,7 @@ class ImportRepository
         ]);
 
         $summary = [
-            'Total de cursos importados' => $totalCourses,
+            'Total de unidades didácticas importadas' => $totalCourses,
             'Total de secciones importadas' => $totalSections,
             'Total de turnos importados' => $totalShifts,
             'Total de clases importadas' => $totalClassrooms,

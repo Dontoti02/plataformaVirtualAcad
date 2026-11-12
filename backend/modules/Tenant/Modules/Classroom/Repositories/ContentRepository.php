@@ -38,7 +38,7 @@ class ContentRepository
         $classroom = Classroom::byKey('id', $classroom_id);
 
         $syllabus = ContentGroup::firstOrCreate([
-            'title' => 'Sílabo',
+            'title' => 'Documentos Pedagógicos',
             'classroom_id' => $classroom_id,
         ]);
 
@@ -49,7 +49,7 @@ class ContentRepository
 
         $contentGroups = ContentGroup::select()
             ->where('classroom_id', $classroom_id)
-            ->whereNot('title', 'Sílabo')
+            ->whereNotIn('title', ['Documentos Pedagógicos', 'Sílabo'])
             ->get();
 
         $contentGroupsMap = [];
@@ -473,7 +473,7 @@ class ContentRepository
                 NULL as date_limit,
                 NULL as status
             ")
-            ->where('title', 'Sílabo')
+            ->whereIn('title', ['Documentos Pedagógicos', 'Sílabo'])
             ->get();
 
         $contents = Content::selectRaw("
@@ -495,7 +495,7 @@ class ContentRepository
             ->leftJoin('indicator', 'content.indicator_id', 'indicator.id')
             ->leftJoin('capacity', 'indicator.capacity_id', 'capacity.id')
             ->where('content_group.classroom_id', $classroom_id)
-            ->whereNot('content_group.title', 'Sílabo')
+            ->whereNotIn('content_group.title', ['Documentos Pedagógicos', 'Sílabo'])
             ->orderBy('content_group.id', 'asc')
             ->orderBy('content.created_at', 'asc')
             ->get();
