@@ -35,7 +35,7 @@ class HomeTeacherRepository
 
         $summary = [
             [
-                'title' => 'Cursos a cargo',
+                'title' => 'Unidades didácticas a cargo',
                 'value' => $classrooms->total,
             ],
             [

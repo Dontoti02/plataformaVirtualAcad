@@ -36,7 +36,7 @@ class HomeStudentRepository
 
         $summary = [
             [
-                'title' => 'Cursos inscritos',
+                'title' => 'Unidades didácticas inscritas',
                 'value' => $classrooms->total,
             ],
             [
