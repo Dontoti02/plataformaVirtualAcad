@@ -18,13 +18,16 @@ class PeriodRepository
         $periods = PeriodHelper::list();
 
         foreach ($periods as $period) {
-            $period->classrooms = Classroom::select()
-                ->where('period_id', $period->id)
-                ->count();
+            $classroomQuery = Classroom::select()
+                ->join('course', 'classroom.course_id', 'course.id')
+                ->where('classroom.period_id', $period->id);
+            StudyProgramHelper::scopeQueryByStudyProgram($classroomQuery, 'course.study_program_id');
+            $period->classrooms = $classroomQuery->count();
 
-            $period->students = Student::select()
-                ->where('period_id', $period->id)
-                ->count();
+            $studentQuery = Student::select()
+                ->where('period_id', $period->id);
+            StudyProgramHelper::scopeQueryByStudyProgram($studentQuery, 'student.study_program_id');
+            $period->students = $studentQuery->count();
         }
 
         return $periods;
@@ -74,7 +77,11 @@ class PeriodRepository
     {
         PeriodHelper::validateListClassroomsRequest($request);
 
-        $classrooms = Classroom::select([
+        if ($request->filled('study_program_id')) {
+            StudyProgramHelper::validateStudyProgramAccess((int) $request->study_program_id);
+        }
+
+        $query = Classroom::select([
             'classroom.id',
             'study_program.name as study_program',
             'cycle.name as cycle',
@@ -89,7 +96,11 @@ class PeriodRepository
             })
             ->when($request->filled('search'), function ($query) use ($request) {
                 $query->where('course.name', 'like', "%$request->search%");;
-            })
+            });
+
+        StudyProgramHelper::scopeQueryByStudyProgram($query, 'course.study_program_id');
+
+        $classrooms = $query
             ->orderBy('course.name', 'asc')
             ->distinct()
             ->paginate($request->size, ['*'], 'page', $request->page);

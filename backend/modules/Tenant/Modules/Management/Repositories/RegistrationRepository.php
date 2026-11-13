@@ -32,6 +32,7 @@ class RegistrationRepository
     public static function listStudents(Request $request)
     {
         RegistrationHelper::validateListStudentsRequest($request);
+        StudyProgramHelper::validateStudyProgramAccess((int) $request->study_program_id);
 
         $students = Student::select([
             'person.id',
@@ -57,12 +58,16 @@ class RegistrationRepository
 
         RegistrationHelper::validateListRequest($request, $is_student);
 
+        if (!$is_student) {
+            StudyProgramHelper::validateStudentPersonAccess((int) $request->person_id, $user);
+        }
+
         $person_id = $is_student ? $user->person_id : $request->person_id;
 
         $person = Person::byKey('id', $person_id);
         $period = Period::byKey('id', $request->period_id);
 
-        $result = Classroom::select([
+        $query = Classroom::select([
             'classroom.id',
             'course.name as course',
             'person.names as teacher',
@@ -82,7 +87,13 @@ class RegistrationRepository
                     ->where('student.person_id', $person_id);
             })
             ->where('classroom.period_id', $request->period_id)
-            ->where('participant.person_id', $person_id)
+            ->where('participant.person_id', $person_id);
+
+        if (!$is_student) {
+            StudyProgramHelper::scopeQueryByStudyProgram($query, 'course.study_program_id', $user);
+        }
+
+        $result = $query
             ->orderBy('course.name', 'asc')
             ->distinct()
             ->get();
@@ -99,11 +110,15 @@ class RegistrationRepository
 
         RegistrationHelper::validateConsolidatedRequest($request, $is_student);
 
+        if (!$is_student) {
+            StudyProgramHelper::validateStudentPersonAccess((int) $request->person_id, $user);
+        }
+
         $person_id = $is_student ? $user->person_id : $request->person_id;
 
         $person = Person::byKey('id', $person_id);
 
-        $result = Student::selectRaw("
+        $query = Student::selectRaw("
             student.id,
             period.name as period,
             cycle.name as cycle,
@@ -119,7 +134,13 @@ class RegistrationRepository
             ->join('participant', 'classroom.id', 'participant.classroom_id')
             ->where('student.person_id', $person_id)
             ->where('participant.person_id', $person_id)
-            ->whereColumn('classroom.period_id', 'student.period_id')
+            ->whereColumn('classroom.period_id', 'student.period_id');
+
+        if (!$is_student) {
+            StudyProgramHelper::scopeQueryByStudyProgram($query, 'student.study_program_id', $user);
+        }
+
+        $result = $query
             ->groupBy('student.id', 'period.name', 'cycle.name', 'student.registration_date')
             ->orderBy('period.name', 'asc')
             ->distinct()

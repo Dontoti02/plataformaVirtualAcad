@@ -58,14 +58,19 @@ class UserHelper
             RolTenant::COORDINADOR_ACADEMICO,
         ]);
 
+        $rolIds = array_map('intval', is_array($request->rol_ids) ? $request->rol_ids : []);
+        $requiresStudyProgram = in_array(RolTenant::COORDINADOR_ACADEMICO, $rolIds, true);
+
         $validator = Validator::make($request->all(), [
-            "document_type"     => "required|string|exists:person,document_type",
-            "document_number"   => "required|string|size:8|unique:person,document_number",
-            "names"             => "required|string",
-            "phone"             => "required|string|size:9",
-            "email"             => "required|email|unique:user,email",
-            "rol_ids"           => "required|array",
-            "rol_ids.*"         => "required|numeric|exists:rol,id|in:" . $roles,
+            "document_type"       => "required|string|exists:person,document_type",
+            "document_number"     => "required|string|size:8|unique:person,document_number",
+            "names"               => "required|string",
+            "phone"               => "required|string|size:9",
+            "email"               => "required|email|unique:user,email",
+            "rol_ids"             => "required|array",
+            "rol_ids.*"           => "required|numeric|exists:rol,id|in:" . $roles,
+            "study_program_ids"   => $requiresStudyProgram ? "required|array|min:1" : "nullable|array",
+            "study_program_ids.*" => "required|numeric|exists:study_program,id",
         ]);
 
         if ($validator->fails()) {
@@ -78,13 +83,20 @@ class UserHelper
         $exceptIdPerson = $user->person_id;
         $exceptIdUser = $user->id;
         $required = $is_admin ? 'required' : 'nullable';
+        $isCoordinator = $user->roles()
+            ->where('rol.id', RolTenant::COORDINADOR_ACADEMICO)
+            ->exists();
 
         $validator = Validator::make($request->all(), [
-            "document_type"     => "$required|string|exists:person,document_type",
-            "document_number"   => "$required|string|size:8|unique:person,document_number,$exceptIdPerson",
-            "names"             => "$required|string",
-            "phone"             => "required|string|size:9",
-            "email"             => "required|email|unique:user,email,$exceptIdUser",
+            "document_type"       => "$required|string|exists:person,document_type",
+            "document_number"     => "$required|string|size:8|unique:person,document_number,$exceptIdPerson",
+            "names"               => "$required|string",
+            "phone"               => "required|string|size:9",
+            "email"               => "required|email|unique:user,email,$exceptIdUser",
+            "study_program_ids"   => ($isCoordinator && $request->exists('study_program_ids'))
+                ? "required|array|min:1"
+                : "nullable|array",
+            "study_program_ids.*" => "required|numeric|exists:study_program,id",
         ]);
 
         if ($validator->fails()) {

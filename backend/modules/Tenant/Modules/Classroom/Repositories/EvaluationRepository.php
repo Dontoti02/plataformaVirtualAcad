@@ -25,6 +25,8 @@ class EvaluationRepository
         $user = User::find($session->id);
         $is_student = $user->rol_id === RolTenant::STUDENT;
 
+        \Modules\Tenant\Modules\Management\Helpers\StudyProgramHelper::validateClassroomAccess($classroom_id, $user);
+
         $classroom = Classroom::byKey('id', $classroom_id);
 
         if (!$is_student) {

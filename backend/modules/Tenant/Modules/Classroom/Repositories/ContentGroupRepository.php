@@ -16,6 +16,8 @@ class ContentGroupRepository
 {
     public static function list(int $classroom_id)
     {
+        \Modules\Tenant\Modules\Management\Helpers\StudyProgramHelper::validateClassroomAccess($classroom_id);
+
         $classroom = Classroom::byKey('id', $classroom_id);
 
         $content_groups = $classroom->contentGroups()

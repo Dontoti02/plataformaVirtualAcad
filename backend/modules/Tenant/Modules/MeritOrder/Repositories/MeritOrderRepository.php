@@ -5,8 +5,8 @@ namespace Modules\Tenant\Modules\MeritOrder\Repositories;
 use Illuminate\Http\Request;
 use Modules\Tenant\Modules\Classroom\Models\Participant;
 use Modules\Tenant\Modules\Management\Helpers\CycleHelper;
+use Modules\Tenant\Modules\Management\Helpers\StudyProgramHelper;
 use Modules\Tenant\Modules\Management\Models\Period;
-use Modules\Tenant\Modules\Management\Models\StudyProgram;
 use Modules\Tenant\Modules\MeritOrder\Helpers\MeritOrderHelper;
 use Modules\Tenant\Modules\User\Helpers\RolHelper;
 
@@ -18,9 +18,7 @@ class MeritOrderRepository
             ->orderBy('name', 'desc')
             ->get();
 
-        $study_programs = StudyProgram::select('id', 'name')
-            ->orderBy('name', 'asc')
-            ->get();
+        $study_programs = StudyProgramHelper::list();
 
         $cycles = CycleHelper::list();
 
@@ -37,6 +35,7 @@ class MeritOrderRepository
     {
         RolHelper::validateSecretaryOrAdminAccess();
         MeritOrderHelper::validateListRequest($request);
+        StudyProgramHelper::validateStudyProgramAccess((int) $request->study_program_id);
 
         $query = Participant::selectRaw("
             person.id,

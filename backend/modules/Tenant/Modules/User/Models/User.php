@@ -45,6 +45,12 @@ class User extends Authenticatable implements JWTSubject
         return $this->belongsToMany(Rol::class, 'rol_user');
     }
 
+    public function studyPrograms(): BelongsToMany
+    {
+        return $this->belongsToMany(\Modules\Tenant\Modules\Management\Models\StudyProgram::class, 'user_study_program')
+            ->withTimestamps();
+    }
+
     public function hasRole($roleId): bool
     {
         return $this->roles()

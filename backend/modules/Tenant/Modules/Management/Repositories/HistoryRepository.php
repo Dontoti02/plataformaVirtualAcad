@@ -28,6 +28,7 @@ class HistoryRepository
     public static function listStudents(Request $request)
     {
         HistoryHelper::validateListStudentsRequest($request);
+        StudyProgramHelper::validateStudyProgramAccess((int) $request->study_program_id);
 
         $students = Student::select([
             'person.id',
@@ -52,6 +53,10 @@ class HistoryRepository
 
         HistoryHelper::validateListRequest($request, $is_student);
 
+        if (!$is_student) {
+            StudyProgramHelper::validateStudentPersonAccess((int) $request->person_id, $user);
+        }
+
         $person_id = $is_student ? $user->person_id : $request->person_id;
 
         $person = Person::byKey('id', $person_id);
@@ -62,7 +67,7 @@ class HistoryRepository
 
         $accumulated_average = 0;
         foreach ($result as $index => $period) {
-            $courses = $period->classrooms()
+            $coursesQuery = $period->classrooms()
                 ->selectRaw("
                         course.id,
                         course.name,
@@ -70,7 +75,13 @@ class HistoryRepository
                     ")
                 ->join('course', 'classroom.course_id', 'course.id')
                 ->join('participant', 'classroom.id', 'participant.classroom_id')
-                ->where('participant.person_id', $person_id)
+                ->where('participant.person_id', $person_id);
+
+            if (!$is_student) {
+                StudyProgramHelper::scopeQueryByStudyProgram($coursesQuery, 'course.study_program_id', $user);
+            }
+
+            $courses = $coursesQuery
                 ->orderBy('course.name', 'asc')
                 ->get();
 

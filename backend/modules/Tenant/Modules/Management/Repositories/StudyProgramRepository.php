@@ -35,6 +35,10 @@ class StudyProgramRepository
             ? $user->person->students->last()->study_program_id
             : $request->study_program_id;
 
+        if (!$is_student) {
+            StudyProgramHelper::validateStudyProgramAccess((int) $study_program_id, $user);
+        }
+
         $cycles = Cycle::select('id', 'name')
             ->orderBy('name', 'asc')
             ->get()

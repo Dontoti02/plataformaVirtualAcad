@@ -9,6 +9,7 @@ use Modules\Tenant\Modules\Classroom\Helpers\ClassroomHelper;
 use Modules\Tenant\Modules\Classroom\Models\Classroom;
 use Modules\Tenant\Modules\Classroom\Models\Participant;
 use Modules\Tenant\Modules\Management\Helpers\PeriodHelper;
+use Modules\Tenant\Modules\Management\Helpers\StudyProgramHelper;
 use Modules\Tenant\Modules\Management\Models\Period;
 use Modules\Tenant\Modules\User\Enums\RolTenant;
 use Modules\Tenant\Modules\User\Models\User;
@@ -33,7 +34,7 @@ class ClassroomRepository
         $search = trim((string) $request->input('search'));
         $periodId = $request->input('period_id');
 
-        return Classroom::select([
+        $query = Classroom::select([
             'classroom.id',
             'classroom.period_id',
             'period.name as period',
@@ -61,7 +62,11 @@ class ClassroomRepository
             ->when($search !== '', fn ($query) => $query->where(fn ($sub) => $sub
                 ->orWhere('course.name', 'like', "%$search%")
                 ->orWhere('period.name', 'like', "%$search%")
-                ->orWhere('section.name', 'like', "%$search%")))
+                ->orWhere('section.name', 'like', "%$search%")));
+
+        StudyProgramHelper::scopeQueryByStudyProgram($query, 'course.study_program_id', $user);
+
+        return $query
             ->orderBy('period.name', 'desc')
             ->orderBy('cycle.name', 'asc')
             ->orderBy('course.name', 'asc')
@@ -87,7 +92,7 @@ class ClassroomRepository
         $result = [];
         foreach ($periods as $period) {
 
-            $classrooms = $period->classrooms()->selectRaw("
+            $classroomsQuery = $period->classrooms()->selectRaw("
                 classroom.id,
                 course.name as course,
                 person.names as teacher,
@@ -113,7 +118,11 @@ class ClassroomRepository
                 })
                 ->when($user->rol_id === RolTenant::STUDENT, function ($query) {
                     $query->orderBy('participant.is_favorite', 'desc');
-                })
+                });
+
+            StudyProgramHelper::scopeQueryByStudyProgram($classroomsQuery, 'course.study_program_id', $user);
+
+            $classrooms = $classroomsQuery
                 ->orderBy('course.name', 'asc')
                 ->get();
 
@@ -128,6 +137,8 @@ class ClassroomRepository
 
     public static function get(int $id)
     {
+        StudyProgramHelper::validateClassroomAccess($id);
+
         $classroom = Classroom::selectRaw("
             classroom.id,
             course.name as course,

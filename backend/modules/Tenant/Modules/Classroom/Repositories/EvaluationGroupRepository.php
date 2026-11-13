@@ -16,6 +16,8 @@ class EvaluationGroupRepository
 {
     public static function list(int $classroom_id)
     {
+        \Modules\Tenant\Modules\Management\Helpers\StudyProgramHelper::validateClassroomAccess($classroom_id);
+
         $classroom = Classroom::byKey('id', $classroom_id);
 
         $evaluation_groups = $classroom->evaluationGroups()

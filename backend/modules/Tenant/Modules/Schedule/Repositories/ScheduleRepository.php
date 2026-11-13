@@ -51,6 +51,7 @@ class ScheduleRepository
     public static function filtersByExport(Request $request)
     {
         ScheduleHelper::validateFiltersByExportRequest($request);
+        StudyProgramHelper::validateStudyProgramAccess((int) $request->study_program_id);
 
         $roles = Rol::select()
             ->whereIn('id', [RolTenant::TEACHER, RolTenant::STUDENT])
@@ -94,6 +95,10 @@ class ScheduleRepository
         $is_student = $user->rol_id ==  RolTenant::STUDENT;
 
         ScheduleHelper::validateListRequest($request, $is_secretary);
+
+        if ($is_secretary) {
+            StudyProgramHelper::validateStudyProgramAccess((int) $request->study_program_id, $user);
+        }
 
         $classrooms = Classroom::select([
             'classroom.id',
@@ -185,6 +190,7 @@ class ScheduleRepository
     public static function listClassrooms(Request $request)
     {
         ScheduleHelper::validateListClassroomsRequest($request);
+        StudyProgramHelper::validateStudyProgramAccess((int) $request->study_program_id);
 
         $hours = SystemConfigurationHelper::getStudyHours();
         $shift_one = Shifts::ONE;
@@ -228,6 +234,7 @@ class ScheduleRepository
     public static function listClassroomsExisting(Request $request)
     {
         ScheduleHelper::validateListClassroomsRequest($request);
+        StudyProgramHelper::validateStudyProgramAccess((int) $request->study_program_id);
 
         $hours = SystemConfigurationHelper::getStudyHours();
         $shift_one = Shifts::ONE;
@@ -296,6 +303,7 @@ class ScheduleRepository
         RolHelper::validateSecretaryOrAdminAccess();
 
         ScheduleHelper::validateRequest($request);
+        StudyProgramHelper::validateClassroomAccess((int) $request->classroom_id);
 
         $classroom = Classroom::find($request->classroom_id);
 
@@ -332,6 +340,7 @@ class ScheduleRepository
 
         $schedule = Schedule::byKey('id', $id);
         $classroom = $schedule->classroom;
+        StudyProgramHelper::validateClassroomAccess((int) $classroom->id);
 
         // Validar que periodo sea el actual
         PeriodHelper::validateByClassroom($classroom->id);
@@ -362,6 +371,7 @@ class ScheduleRepository
         RolHelper::validateSecretaryOrAdminAccess();
 
         $schedule = Schedule::byKey('id', $id);
+        StudyProgramHelper::validateClassroomAccess((int) $schedule->classroom_id);
 
         // Validar que periodo sea el actual
         PeriodHelper::validateByClassroom($schedule->classroom_id);
@@ -376,6 +386,7 @@ class ScheduleRepository
         RolHelper::validateSecretaryOrAdminAccess();
 
         ScheduleHelper::validateAssignTeacherRequest($request);
+        StudyProgramHelper::validateClassroomAccess((int) $request->classroom_id);
 
         $classroom = Classroom::find($request->classroom_id);
 
@@ -425,6 +436,10 @@ class ScheduleRepository
             $is_student = $request->rol_id == RolTenant::STUDENT;
 
             $person_id = $request->person_id;
+
+            if ($is_student) {
+                StudyProgramHelper::validateStudentPersonAccess((int) $person_id, $user);
+            }
         }
 
         $rol = $is_teacher ? 'DOCENTE' : 'ALUMNO';
@@ -433,16 +448,17 @@ class ScheduleRepository
         $person = $person->document_number . ' - ' . $person->names;
 
         if ($is_student) {
-            $student = Student::select()
+            $studentQuery = Student::select()
                 ->where('period_id', $request->period_id)
-                ->where('person_id', $person_id)
-                ->first();
-            $studyProgram = StudyProgram::byKey('id', $student->study_program_id)->name;
+                ->where('person_id', $person_id);
+            StudyProgramHelper::scopeQueryByStudyProgram($studentQuery, 'student.study_program_id', $user);
+            $student = $studentQuery->first();
+            $studyProgram = $student ? StudyProgram::byKey('id', $student->study_program_id)->name : null;
         } else {
             $studyProgram = null;
         }
 
-        $select = Classroom::select([
+        $selectQuery = Classroom::select([
             'classroom.id',
             'course.name as course',
             'section.name as section',
@@ -462,7 +478,11 @@ class ScheduleRepository
                     ->leftJoin('person', 'teacher.person_id', 'person.id')
                     ->join('participant', 'classroom.id', 'participant.classroom_id')
                     ->where('participant.person_id', $person_id);
-            })
+            });
+
+        StudyProgramHelper::scopeQueryByStudyProgram($selectQuery, 'course.study_program_id', $user);
+
+        $select = $selectQuery
             ->distinct()
             ->get();
 

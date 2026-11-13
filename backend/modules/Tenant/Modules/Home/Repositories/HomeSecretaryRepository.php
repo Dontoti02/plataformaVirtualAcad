@@ -6,6 +6,7 @@ use Modules\Tenant\Modules\Classroom\Models\Assistance;
 use Modules\Tenant\Modules\Classroom\Models\Classroom;
 use Modules\Tenant\Modules\Classroom\Models\Student;
 use Modules\Tenant\Modules\Management\Helpers\PeriodHelper;
+use Modules\Tenant\Modules\Management\Helpers\StudyProgramHelper;
 use Modules\Tenant\Modules\Management\Models\Staff;
 use Modules\Tenant\Modules\Management\Models\StudyProgram;
 use Modules\Tenant\Modules\SystemConfiguration\Helpers\SystemConfigurationHelper;
@@ -58,9 +59,7 @@ class HomeSecretaryRepository
 
     public static function getStudyPrograms(int $period_id)
     {
-        $study_programs = StudyProgram::select('id', 'name')
-            ->orderBy('name', 'asc')
-            ->get();
+        $study_programs = StudyProgramHelper::list();
 
         foreach ($study_programs as $study_program) {
             $query = $study_program->courses();
@@ -110,9 +109,13 @@ class HomeSecretaryRepository
 
     public static function getClassrooms(int $period_id)
     {
-        $total = Classroom::select()
-            ->where('classroom.period_id', $period_id)
-            ->count();
+        $query = Classroom::select()
+            ->join('course', 'classroom.course_id', 'course.id')
+            ->where('classroom.period_id', $period_id);
+
+        StudyProgramHelper::scopeQueryByStudyProgram($query, 'course.study_program_id');
+
+        $total = $query->count();
 
         $result = (object) [
             'total' => $total,
@@ -123,9 +126,12 @@ class HomeSecretaryRepository
 
     public static function getStudents(int $period_id)
     {
-        $total = Student::select()
-            ->where('period_id', $period_id)
-            ->count();
+        $query = Student::select()
+            ->where('period_id', $period_id);
+
+        StudyProgramHelper::scopeQueryByStudyProgram($query, 'student.study_program_id');
+
+        $total = $query->count();
 
         $result = (object) [
             'total' => $total,
@@ -136,10 +142,29 @@ class HomeSecretaryRepository
 
     public static function getTeachers(int $period_id)
     {
-        $total = Staff::select()
+        $programIds = StudyProgramHelper::assignedStudyProgramIds();
+
+        $query = Staff::select()
             ->where('period_id', $period_id)
-            ->where('type', 'DOCENTE')
-            ->count();
+            ->where('type', 'DOCENTE');
+
+        if ($programIds !== null) {
+            if (empty($programIds)) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->whereExists(function ($sub) use ($period_id, $programIds) {
+                    $sub->select(\Illuminate\Support\Facades\DB::raw(1))
+                        ->from('teacher')
+                        ->join('classroom', 'teacher.classroom_id', '=', 'classroom.id')
+                        ->join('course', 'classroom.course_id', '=', 'course.id')
+                        ->whereColumn('teacher.person_id', 'staff.person_id')
+                        ->where('classroom.period_id', $period_id)
+                        ->whereIn('course.study_program_id', $programIds);
+                });
+            }
+        }
+
+        $total = $query->count();
 
         $result = (object) [
             'total' => $total,

@@ -29,6 +29,7 @@ use Modules\Tenant\Modules\Management\Controllers\PeriodController;
 use Modules\Tenant\Modules\Management\Controllers\RegistrationController;
 use Modules\Tenant\Modules\Management\Controllers\StudyProgramController;
 use Modules\Tenant\Modules\MeritOrder\Controllers\MeritOrderController;
+use Modules\Tenant\Modules\FailedStudents\Controllers\FailedStudentsController;
 use Modules\Tenant\Modules\Schedule\Controllers\ScheduleController;
 use Modules\Tenant\Modules\SystemConfiguration\Controllers\SystemConfigurationController;
 use Modules\Tenant\Modules\Testing\TestingController;
@@ -359,6 +360,13 @@ Route::group(['middleware' => [
       Route::post('list', 'list');
     });
 
+  Route::controller(FailedStudentsController::class)
+    ->prefix('failed_students')
+    ->group(function () {
+      Route::get('filters', 'filters');
+      Route::post('list', 'list');
+    });
+
   Route::controller(EvaluationFormController::class)
     ->prefix('evaluation_form')
     ->group(function () {
@@ -483,6 +491,13 @@ Route::group(['middleware' => [
 
   Route::controller(MeritOrderController::class)
     ->prefix('merit_order')
+    ->group(function () {
+      Route::get('filters', 'filters');
+      Route::post('list', 'list');
+    });
+
+  Route::controller(FailedStudentsController::class)
+    ->prefix('failed_students')
     ->group(function () {
       Route::get('filters', 'filters');
       Route::post('list', 'list');

@@ -64,6 +64,10 @@ class ClassroomHelper
         if (!$is_secretary && !$is_teacher) {
             throw new Exception("No tienes permisos para realizar esta acción");
         }
+
+        if ((int) $rol_id === RolTenant::COORDINADOR_ACADEMICO) {
+            \Modules\Tenant\Modules\Management\Helpers\StudyProgramHelper::validateClassroomAccess((int) $classroom_id);
+        }
     }
 
     public static function validateTeacherAccess($person_id, $classroom_id)
@@ -110,6 +114,10 @@ class ClassroomHelper
 
         if (!$is_secretary && !$is_teacher && !$is_student) {
             throw new Exception("No formas parte de esta clase");
+        }
+
+        if ((int) $rol_id === RolTenant::COORDINADOR_ACADEMICO) {
+            \Modules\Tenant\Modules\Management\Helpers\StudyProgramHelper::validateClassroomAccess((int) $classroom_id);
         }
     }
 

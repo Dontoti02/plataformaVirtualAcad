@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Tenant\Modules\Classroom\Models\Student;
 use Modules\Tenant\Modules\Enroll\Models\Enroll;
+use Modules\Tenant\Modules\User\Models\User;
 
 class StudyProgram extends Model
 {
@@ -44,6 +45,12 @@ class StudyProgram extends Model
     public function plans(): BelongsToMany
     {
         return $this->belongsToMany(StudyPlan::class);
+    }
+
+    public function users(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'user_study_program')
+            ->withTimestamps();
     }
 
     public function scopeByKey($query, $key, $value)

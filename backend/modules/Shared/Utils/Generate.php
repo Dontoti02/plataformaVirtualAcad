@@ -61,7 +61,7 @@ class Generate
         $sheet = $spreadsheet->getActiveSheet();
         $sheet = $template::template($sheet, $data);
         $sheet->setShowGridlines(false);
-        $sheet->setTitle($data->title);
+        $sheet->setTitle(mb_substr($data->sheetTitle ?? $data->title, 0, 31));
         $sheet->getProtection()->setSheet($data->protectSheet ?? true);
         $writer = new Xlsx($spreadsheet);
 

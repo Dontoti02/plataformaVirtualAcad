@@ -1,11 +1,12 @@
 <?php
 
-namespace Modules\Tenant\Modules\ENroll\Repositories;
+namespace Modules\Tenant\Modules\Enroll\Repositories;
 
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Modules\Tenant\Modules\Enroll\Models\Enroll;
 use Modules\Tenant\Modules\Enroll\Models\Scale;
+use Modules\Tenant\Modules\Management\Helpers\StudyProgramHelper;
 use Modules\Tenant\Modules\Management\Models\Period;
 use Modules\Tenant\Modules\Management\Models\Cycle;
 use Modules\Tenant\Modules\Management\Models\ProgramPlan;
@@ -26,8 +27,11 @@ class EnrollRepository
   {
     $period_id = $request->periodId;
     $study_program_id = $request->programId;
+    if ($study_program_id) {
+      StudyProgramHelper::validateStudyProgramAccess((int) $study_program_id);
+    }
     $person_id = $request->personId;
-    $enroll = Enroll::select([
+    $enrollQuery = Enroll::select([
       'enrollment.id',
       'enrollment.registration_date',
       'enrollment.is_full_payment',
@@ -62,7 +66,11 @@ class EnrollRepository
       })
       ->when($period_id, function ($query, $period_id) {
         return $query->where('enrollment.period_id', $period_id);
-      })
+      });
+
+    StudyProgramHelper::scopeQueryByStudyProgram($enrollQuery, 'enrollment.study_program_id');
+
+    $enroll = $enrollQuery
       ->orderBy('enrollment.created_at', 'desc')
       ->get();
     return $enroll;
@@ -77,10 +85,12 @@ class EnrollRepository
       ->whereNot('status', 'TERMINADO')
       ->orderBy('name', 'asc')
       ->get();
-    $study_program = StudyProgram::select([
+    $studyProgramQuery = StudyProgram::select([
       'id',
       'name',
-    ])
+    ]);
+    StudyProgramHelper::scopeQueryByStudyProgram($studyProgramQuery, 'study_program.id');
+    $study_program = $studyProgramQuery
       ->orderBy('name', 'asc')
       ->get();
     $study_program->each(function ($program) {
@@ -216,6 +226,8 @@ class EnrollRepository
       ->where('period_id', $validatedData['enrollData']['period'])
       ->first();
 
+    StudyProgramHelper::validateStudyProgramAccess((int) $validatedData['enrollData']['studyProgram']);
+
     if ($existingEnroll) {
       throw new \Exception('Este estudiante ya se encuentra matriculado en este periodo.');
     }
@@ -247,6 +259,8 @@ class EnrollRepository
     $familiar_data = $request->familiarData;
     $enroll_data = $request->enrollmentData;
     $contact_data = $request->contactData;
+
+    StudyProgramHelper::validateStudyProgramAccess((int) ($enroll_data['studyProgram'] ?? 0));
 
     $person = Person::create([
       'document_type' => $personal_data['documentType'],
@@ -354,6 +368,7 @@ class EnrollRepository
   {
     $enroll = Enroll::find($id);
     if ($enroll) {
+      StudyProgramHelper::validateStudyProgramAccess((int) $enroll->study_program_id);
       $enroll->delete();
       return true;
     } else {
@@ -363,6 +378,9 @@ class EnrollRepository
   public static function get(int $id)
   {
     $enroll = Enroll::find($id);
+    if ($enroll) {
+      StudyProgramHelper::validateStudyProgramAccess((int) $enroll->study_program_id);
+    }
     return $enroll;
   }
 
@@ -377,6 +395,12 @@ class EnrollRepository
       ]);
     }
     $enroll = Enroll::find($id);
+    if ($enroll) {
+      StudyProgramHelper::validateStudyProgramAccess((int) $enroll->study_program_id);
+    }
+    if ($request->filled('study_program_id')) {
+      StudyProgramHelper::validateStudyProgramAccess((int) $request->study_program_id);
+    }
     $enroll->update($request->all());
     return $enroll;
   }

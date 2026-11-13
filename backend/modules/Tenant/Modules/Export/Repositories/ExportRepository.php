@@ -28,6 +28,11 @@ use Modules\Tenant\Modules\Training\Repositories\TrainingAssistanceRepository;
 use Modules\Tenant\Modules\Training\Repositories\TrainingContentRepository;
 use Modules\Tenant\Modules\Training\Repositories\TrainingEvaluationRepository;
 use Modules\Tenant\Modules\Treasury\Models\PaymentConcept;
+use Modules\Tenant\Modules\FailedStudents\Repositories\FailedStudentsRepository;
+use Modules\Tenant\Modules\Export\Templates\FailedStudentsTemplate;
+use Modules\Tenant\Modules\Management\Models\Period;
+use Modules\Tenant\Modules\Management\Models\StudyProgram;
+use Modules\Tenant\Modules\Management\Models\Cycle;
 
 class ExportRepository
 {
@@ -96,14 +101,19 @@ class ExportRepository
             case 'evaluation-record-wide':
                 [$data, $template, $view] = self::exportEvaluationRecordWide($request, $info);
                 break;
+            case 'failed-students':
+                [$data, $template, $view] = self::exportFailedStudents($request, $info);
+                break;
             default:
                 throw new Exception('Key no admitida');
         }
 
-        function ensureNotNull($value, $errorMessage)
-        {
-            if (!$value) {
-                throw new Exception($errorMessage);
+        if (!function_exists('Modules\Tenant\Modules\Export\Repositories\ensureNotNull')) {
+            function ensureNotNull($value, $errorMessage)
+            {
+                if (!$value) {
+                    throw new Exception($errorMessage);
+                }
             }
         }
 
@@ -803,6 +813,120 @@ class ExportRepository
 
         $template = ContentListTemplate::class;
         $view = null;
+
+        return [$data, $template, $view];
+    }
+
+    public static function exportFailedStudents(Request $request, object $info)
+    {
+        $result = FailedStudentsRepository::list($request);
+
+        $periodName = 'Periodo actual';
+        if ($request->filled('period_id')) {
+            $period = Period::find($request->period_id);
+            if ($period) {
+                $periodName = $period->name;
+            }
+        }
+
+        $programName = 'TODOS';
+        if ($request->filled('study_program_id')) {
+            $program = StudyProgram::find($request->study_program_id);
+            if ($program) {
+                $programName = $program->name;
+            }
+        } else {
+            $assignedIds = \Modules\Tenant\Modules\Management\Helpers\StudyProgramHelper::assignedStudyProgramIds();
+            if ($assignedIds !== null) {
+                $assignedNames = StudyProgram::whereIn('id', $assignedIds)
+                    ->orderBy('name', 'asc')
+                    ->pluck('name')
+                    ->all();
+                $programName = !empty($assignedNames) ? implode(', ', $assignedNames) : 'NINGUNO';
+            }
+        }
+
+        $cycleName = 'TODOS';
+        if ($request->filled('cycle_id')) {
+            $cycle = Cycle::find($request->cycle_id);
+            if ($cycle) {
+                $cycleName = $cycle->name;
+            }
+        }
+
+        $classroomName = 'TODAS';
+        if ($request->filled('classroom_id')) {
+            $classroomRow = \Illuminate\Support\Facades\DB::table('classroom')
+                ->join('course', 'classroom.course_id', '=', 'course.id')
+                ->leftJoin('section', 'classroom.section_id', '=', 'section.id')
+                ->leftJoin('shift', 'classroom.shift_id', '=', 'shift.id')
+                ->where('classroom.id', $request->classroom_id)
+                ->select('course.name as course_name', 'section.name as section_name', 'shift.name as shift_name')
+                ->first();
+            if ($classroomRow) {
+                $extra = array_filter([
+                    $classroomRow->section_name ? "Sec. {$classroomRow->section_name}" : null,
+                    $classroomRow->shift_name,
+                ]);
+                $classroomName = $classroomRow->course_name . ($extra ? ' (' . implode(' / ', $extra) . ')' : '');
+            }
+        }
+
+        $title = 'REPORTE DE ESTUDIANTES QUE NO APROBARON LA UNIDAD DIDÁCTICA';
+
+        $columns = [
+            'index' => 'N°',
+            'document_number' => 'D.N.I.',
+            'student_name' => 'APELLIDOS Y NOMBRES',
+            'study_program_name' => 'PROGRAMA DE ESTUDIOS',
+            'cycle_name' => 'CICLO',
+            'section_shift' => 'SEC. / TURNO',
+            'course_name' => 'UNIDAD DIDÁCTICA',
+            'teacher_name' => 'DOCENTE A CARGO',
+            'score' => 'NOTA',
+            'status' => 'CONDICIÓN',
+        ];
+
+        $columnsAligned = [
+            'index',
+            'document_number',
+            'cycle_name',
+            'section_shift',
+            'score',
+            'status',
+        ];
+
+        $filters = [
+            'Periodo' => $periodName,
+            'Programa de Estudios' => $programName,
+            'Ciclo' => $cycleName,
+            'Unidad Didáctica' => $classroomName,
+        ];
+        if ($request->filled('search')) {
+            $filters['Búsqueda'] = trim($request->search);
+        }
+
+        $filename = 'reporte_estudiantes_desaprobados_' . Generate::sanitizeFilename($periodName) . '_' . date('Ymd_His');
+
+        $data = (object) [
+            'institutionName' => $info->institutionName,
+            'institutionLogo' => $info->institutionLogo,
+            'applicationName' => $info->applicationName,
+            'title' => $title,
+            'sheetTitle' => 'Estudiantes Desaprobados',
+            'date' => $info->date,
+            'filters' => $filters,
+            'summary' => $result['summary'],
+            'columns' => $columns,
+            'columnsAligned' => $columnsAligned,
+            'rows' => $result['students']->values()->all(),
+            'filename' => $filename,
+            'orientation' => 'landscape',
+            'paper' => 'a4',
+        ];
+
+        $template = FailedStudentsTemplate::class;
+        $view = 'exports.failed-students';
 
         return [$data, $template, $view];
     }

@@ -33,9 +33,12 @@ class UserRepository
             ])
             ->get();
 
+        $study_programs = \Modules\Tenant\Modules\Management\Helpers\StudyProgramHelper::list();
+
         $result = [
             'documents' => $documents,
             'roles' => $roles,
+            'study_programs' => $study_programs,
         ];
 
         return $result;
@@ -49,8 +52,9 @@ class UserRepository
 
         $staffs = in_array($request->rol_id, [RolTenant::SECRETARY, RolTenant::TEACHER]);
         $students = in_array($request->rol_id, [RolTenant::STUDENT]);
+        $coordinatorProgramIds = \Modules\Tenant\Modules\Management\Helpers\StudyProgramHelper::assignedStudyProgramIds();
 
-        $users = User::select([
+        $usersQuery = User::select([
             'user.id',
             'rol.id as rol_id',
             'user.avatar as photo',
@@ -74,22 +78,82 @@ class UserRepository
             ->when($students, function ($query) {
                 $query->join('student', 'person.id', 'student.person_id');
             })
+            ->when($coordinatorProgramIds !== null && $students, function ($query) use ($coordinatorProgramIds) {
+                if (empty($coordinatorProgramIds)) {
+                    $query->whereRaw('1 = 0');
+                } else {
+                    $query->whereIn('student.study_program_id', $coordinatorProgramIds);
+                }
+            })
+            ->when($coordinatorProgramIds !== null && in_array(RolTenant::COORDINADOR_ACADEMICO, array_map('intval', (array) $request->rol_ids), true), function ($query) use ($coordinatorProgramIds) {
+                if (empty($coordinatorProgramIds)) {
+                    $query->whereRaw('1 = 0');
+                } else {
+                    $query->where(function ($subQuery) use ($coordinatorProgramIds) {
+                        $subQuery->where('rol.id', '!=', RolTenant::COORDINADOR_ACADEMICO)
+                            ->orWhereExists(function ($existsQuery) use ($coordinatorProgramIds) {
+                                $existsQuery->select(\Illuminate\Support\Facades\DB::raw(1))
+                                    ->from('user_study_program')
+                                    ->whereColumn('user_study_program.user_id', 'user.id')
+                                    ->whereIn('user_study_program.study_program_id', $coordinatorProgramIds);
+                            });
+                    });
+                }
+            })
             ->when($request->filled('search'), function ($query) use ($request) {
                 $query->where(function ($query) use ($request) {
                     $query->where('person.names', 'like', "%$request->search%")
                         ->orWhere('person.phone', 'like', "%$request->search%")
                         ->orWhere('person.email', 'like', "%$request->search%");
                 });
-            })
+            });
+
+        $users = $usersQuery
             ->orderBy('person.names')
             ->distinct()
             ->paginate($request->size, ['*'], 'page', $request->page);
+
+        $items = collect($users->items());
+        $coordinatorUserIds = $items
+            ->filter(fn ($item) => (int) $item->rol_id === RolTenant::COORDINADOR_ACADEMICO)
+            ->pluck('id')
+            ->unique()
+            ->values()
+            ->all();
+
+        $programsByUser = empty($coordinatorUserIds)
+            ? collect()
+            : \Illuminate\Support\Facades\DB::table('user_study_program')
+                ->join('study_program', 'user_study_program.study_program_id', '=', 'study_program.id')
+                ->select([
+                    'user_study_program.user_id',
+                    'study_program.id',
+                    'study_program.name',
+                ])
+                ->whereIn('user_study_program.user_id', $coordinatorUserIds)
+                ->orderBy('study_program.name', 'asc')
+                ->get()
+                ->groupBy('user_id');
+
+        $items->each(function ($item) use ($programsByUser) {
+            if ((int) $item->rol_id === RolTenant::COORDINADOR_ACADEMICO) {
+                $programs = $programsByUser->get($item->id, collect());
+                $item->study_programs = $programs->map(fn ($p) => [
+                    'id' => (int) $p->id,
+                    'name' => $p->name,
+                ])->values()->all();
+                $item->study_program_ids = $programs->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
+            } else {
+                $item->study_programs = [];
+                $item->study_program_ids = [];
+            }
+        });
 
         $result = [
             'page' => $request->page,
             'size' => $request->size,
             'total' => $users->total(),
-            'users' => $users->items(),
+            'users' => $items->all(),
         ];
 
         return $result;
@@ -116,6 +180,15 @@ class UserRepository
         ]);
 
         $user->roles()->attach($request->rol_ids);
+
+        $rolIds = array_map('intval', (array) $request->rol_ids);
+        if (in_array(RolTenant::COORDINADOR_ACADEMICO, $rolIds, true) && !empty($request->study_program_ids)) {
+            $programIds = array_values(array_unique(array_map('intval', (array) $request->study_program_ids)));
+            foreach ($programIds as $programId) {
+                \Modules\Tenant\Modules\Management\Helpers\StudyProgramHelper::validateStudyProgramAccess($programId);
+            }
+            $user->studyPrograms()->sync($programIds);
+        }
 
         return 'Usuario creado correctamente';
     }
@@ -148,6 +221,18 @@ class UserRepository
         $user->update([
             'email' => $request->email,
         ]);
+
+        $is_coordinator = $user->roles()
+            ->where('rol.id', RolTenant::COORDINADOR_ACADEMICO)
+            ->exists();
+
+        if ($is_coordinator && $request->exists('study_program_ids')) {
+            $programIds = array_values(array_unique(array_map('intval', (array) $request->study_program_ids)));
+            foreach ($programIds as $programId) {
+                \Modules\Tenant\Modules\Management\Helpers\StudyProgramHelper::validateStudyProgramAccess($programId);
+            }
+            $user->studyPrograms()->sync($programIds);
+        }
 
         return 'Usuario actualizado correctamente';
     }
